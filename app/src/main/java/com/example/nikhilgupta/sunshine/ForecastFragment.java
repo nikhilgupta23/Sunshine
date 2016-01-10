@@ -33,6 +33,8 @@ import java.util.ArrayList;
  */
 public class ForecastFragment extends Fragment {
 
+    ArrayAdapter<String> mforecastAdapter;
+
     public ForecastFragment() {
 
         setHasOptionsMenu(true);
@@ -50,7 +52,7 @@ public class ForecastFragment extends Fragment {
         int id= menuItem.getItemId();
         if(id==R.id.menu_refresh) {
          FetchWeatherTask fetchWeatherTask=new FetchWeatherTask();
-            fetchWeatherTask.execute("94043");
+            fetchWeatherTask.execute("576104");
             return true;
         }
         return super.onOptionsItemSelected(menuItem);
@@ -71,12 +73,12 @@ public class ForecastFragment extends Fragment {
         al.add("h");
         al.add("i");
 
-        ArrayAdapter<String> aa = new ArrayAdapter<>(getActivity(), R.layout.list_item_forecast, R.id.list_item_forecast_textview, al);
+        mforecastAdapter = new ArrayAdapter<>(getActivity(), R.layout.list_item_forecast, R.id.list_item_forecast_textview, al);
 
         View rootView = inflater.inflate(R.layout.fragment_main, container, false);
 
         ListView lv = (ListView) rootView.findViewById(R.id.list_view_forecast);
-        lv.setAdapter(aa);
+        lv.setAdapter(mforecastAdapter);
 
         return rootView;
     }
@@ -165,6 +167,7 @@ public class ForecastFragment extends Fragment {
                 day = getReadableDateString(dateTime);
 
                 // description is in a child array called "weather", which is 1 element long.
+                // description is in a child array called "weather", which is 1 element long.
                 JSONObject weatherObject = dayForecast.getJSONArray(OWM_WEATHER).getJSONObject(0);
                 description = weatherObject.getString(OWM_DESCRIPTION);
 
@@ -186,9 +189,16 @@ public class ForecastFragment extends Fragment {
         }
 
         @Override
+        protected void onPostExecute(String[] strings) {
+            if (strings != null) {
+                mforecastAdapter.clear();
+                for (String s : strings)
+                    mforecastAdapter.add(s);
+            }
+        }
+
+        @Override
         protected String[] doInBackground(String... Params) {
-
-
             HttpURLConnection urlConnection = null;
             BufferedReader reader = null;
             String result[] = {};
@@ -197,8 +207,8 @@ public class ForecastFragment extends Fragment {
             String format = "json";
             String units = "metric";
             int numDays = 7;
+            String appid = "4b29cc69cb3ac98c082177383639a601";
             try
-
             {
                 // Construct the URL for the OpenWeatherMap query
                 // Possible parameters are available at OWM's forecast API page, at
@@ -209,12 +219,15 @@ public class ForecastFragment extends Fragment {
                 final String FORMAT_PARAM = "mode";
                 final String UNITS_PARAM = "units";
                 final String DAYS_PARAM = "cnt";
+                final String APP_ID = "APPID";
+
 
                 Uri builtUri = Uri.parse(FORECAST_BASE_URL).buildUpon()
                         .appendQueryParameter(QUERY_PARAM, Params[0])
                         .appendQueryParameter(FORMAT_PARAM, format)
                         .appendQueryParameter(UNITS_PARAM, units)
-                        .appendQueryParameter(DAYS_PARAM, Integer.toString(numDays)).build();
+                        .appendQueryParameter(DAYS_PARAM, Integer.toString(numDays))
+                        .appendQueryParameter(APP_ID, appid).build();
 
                 URL url = new URL(builtUri.toString());
                 // Create the request to OpenWeatherMap, and open the connection
@@ -225,10 +238,8 @@ public class ForecastFragment extends Fragment {
                 // Read the input stream into a String
                 InputStream inputStream = urlConnection.getInputStream();
                 StringBuilder buffer = new StringBuilder();
-                if (inputStream == null) {
-                    // Nothing to do.
-                    forecastJsonStr = null;
-                }
+
+                assert inputStream != null;
                 reader = new BufferedReader(new InputStreamReader(inputStream));
 
                 String line;
@@ -239,17 +250,12 @@ public class ForecastFragment extends Fragment {
                     buffer.append(line).append("\n");
                 }
 
-                if (buffer.length() == 0) {
-                    // Stream was empty.  No point in parsing.
-                }
                 forecastJsonStr = buffer.toString();
                 result = getWeatherDataFromJson(forecastJsonStr, numDays);
-            } catch (java.io.IOException e) {
+            } catch (IOException | JSONException e) {
                 Log.e("PlaceholderFragment", "Error ", e);
                 // If the code didn't successfully get the weather data, there's no point in attempting
                 // to parse it.
-            } catch (JSONException e) {
-                Log.e("PlaceholderFragment", "Error ", e);
             } finally {
                 if (urlConnection != null) {
                     urlConnection.disconnect();
